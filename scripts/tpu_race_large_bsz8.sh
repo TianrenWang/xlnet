@@ -5,7 +5,7 @@ RACE_DIR=data/RACE
 INIT_CKPT_DIR=xlnet_cased_L-24_H-1024_A-16
 
 #### google storage path
-GS_ROOT=
+GS_ROOT=/Users/frank/Desktop/deep_learning/xlnet
 GS_INIT_CKPT_DIR=${GS_ROOT}/${INIT_CKPT_DIR}
 GS_PROC_DATA_DIR=${GS_ROOT}/proc_data/race
 GS_MODEL_DIR=${GS_ROOT}/experiment/race
@@ -13,8 +13,8 @@ GS_MODEL_DIR=${GS_ROOT}/experiment/race
 # TPU name in google cloud
 TPU_NAME=
 
-python run_race.py \
-  --use_tpu=True \
+python3 run_race.py \
+  --use_tpu=False \
   --tpu=${TPU_NAME} \
   --num_hosts=1 \
   --num_core_per_host=8 \
@@ -28,7 +28,7 @@ python run_race.py \
   --max_qa_length=128 \
   --uncased=False \
   --do_train=True \
-  --train_batch_size=8 \
+  --train_batch_size=1 \
   --do_eval=True \
   --eval_batch_size=32 \
   --train_steps=12000 \
