@@ -30,6 +30,9 @@ from classifier_utils import PaddingInputExample
 from classifier_utils import convert_single_example
 from prepro_utils import preprocess_text, encode_ids
 
+import locale
+locale.setlocale(locale.LC_ALL, locale="en_US.UTF-8")
+
 # Model
 flags.DEFINE_string("model_config_path", default=None,
       help="Model config path.")
