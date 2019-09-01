@@ -5,7 +5,7 @@ RACE_DIR=data/RACE
 INIT_CKPT_DIR=xlnet_cased_L-24_H-1024_A-16
 
 #### google storage path
-GS_ROOT=/Users/frank/Desktop/deep_learning/xlnet
+GS_ROOT=${PWD%/*}
 GS_INIT_CKPT_DIR=${GS_ROOT}/${INIT_CKPT_DIR}
 GS_PROC_DATA_DIR=${GS_ROOT}/proc_data/race
 GS_MODEL_DIR=${GS_ROOT}/experiment/race
