@@ -466,7 +466,7 @@ def main(_):
     return encode_ids(sp, text)
 
   # TPU Configuration
-  run_config = model_utils.configure_tpu(FLAGS)
+  run_config = model_utils.configure(FLAGS)
 
   model_fn = get_model_fn()
 

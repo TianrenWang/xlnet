@@ -57,6 +57,25 @@ def configure_tpu(FLAGS):
   return run_config
 
 
+def configure(FLAGS):
+  session_config = tf.ConfigProto(allow_soft_placement=True)
+  # Uncomment the following line if you hope to monitor GPU RAM growth
+  # session_config.gpu_options.allow_growth = True
+  strategy = tf.distribute.MirroredStrategy()
+  tf.logging.info('Use MirroredStrategy with %d devices.', strategy.num_replicas_in_sync)
+
+  config = tf.estimator.RunConfig(
+      train_distribute=strategy,
+      eval_distribute=strategy,
+      model_dir=FLAGS.model_dir,
+      session_config=session_config,
+      keep_checkpoint_max=FLAGS.max_save,
+      save_checkpoints_secs=None,
+      save_checkpoints_steps=FLAGS.save_steps
+  )
+  return config
+
+
 def init_from_checkpoint(FLAGS, global_vars=False):
   tvars = tf.global_variables() if global_vars else tf.trainable_variables()
   initialized_variable_names = {}
