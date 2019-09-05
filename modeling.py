@@ -74,8 +74,6 @@ def positionwise_ffn(inp, d_model, d_inner, dropout, kernel_initializer,
                                name='drop_2')
     output = tf.contrib.layers.layer_norm(output + inp, begin_norm_axis=-1,
                                           scope='LayerNorm')
-    # output = tf.keras.layers.BatchNormalization(axis=-1)(output + inp, is_training=is_training)
-
   return output
 
 
@@ -101,11 +99,9 @@ def post_attention(h, attn_vec, d_model, n_head, d_head, dropout, is_training,
   if residual:
     output = tf.contrib.layers.layer_norm(attn_out + h, begin_norm_axis=-1,
                                           scope='LayerNorm')
-    # output = tf.keras.layers.BatchNormalization(axis=-1)(attn_out + h, is_training=is_training)
   else:
     output = tf.contrib.layers.layer_norm(attn_out, begin_norm_axis=-1,
                                           scope='LayerNorm')
-    # output = tf.keras.layers.BatchNormalization(axis=-1)(attn_out, is_training=is_training)
 
   return output
 
@@ -784,4 +780,3 @@ def regression_loss(hidden, labels, initializer, scope, reuse=None,
       return loss, logits
 
     return loss
-
