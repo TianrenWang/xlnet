@@ -13,6 +13,7 @@ from six.moves import zip
 from absl import flags
 
 import tensorflow as tf
+# from tensorflow.core.protobuf import rewriter_config_pb2
 
 
 def configure_tpu(FLAGS):
@@ -59,6 +60,8 @@ def configure_tpu(FLAGS):
 
 def configure(FLAGS):
   session_config = tf.ConfigProto(allow_soft_placement=True)
+  # off = rewriter_config_pb2.RewriterConfig.OFF
+  # session_config.graph_options.rewrite_options.arithmetic_optimization = off
   # Uncomment the following line if you hope to monitor GPU RAM growth
   # session_config.gpu_options.allow_growth = True
   strategy = tf.distribute.MirroredStrategy()

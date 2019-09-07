@@ -166,35 +166,44 @@ class InputFeatures(object):
 
 
 def convert_single_example(example, tokenize_fn):
-  """Converts a single `InputExample` into a single `InputFeatures`."""
+    """Converts a single `InputExample` into a single `InputFeatures`."""
 
-  if isinstance(example, PaddingInputExample):
-    return InputFeatures(
-        input_ids=[0] * FLAGS.max_seq_length * 4,
-        input_mask=[1] * FLAGS.max_seq_length * 4,
-        segment_ids=[0] * FLAGS.max_seq_length * 4,
-        label_id=0,
-        is_real_example=False)
+    if isinstance(example, PaddingInputExample):
+        return InputFeatures(
+            input_ids=[0] * FLAGS.max_seq_length * 4,
+            input_mask=[1] * FLAGS.max_seq_length * 4,
+            segment_ids=[0] * FLAGS.max_seq_length * 4,
+            label_id=0,
+            is_real_example=False)
 
-  input_ids, input_mask, all_seg_ids = [], [], []
-  tokens_context = tokenize_fn(example.context)
-  for i in range(len(example.qa_list)):
-    tokens_qa = tokenize_fn(example.qa_list[i])
-    if len(tokens_qa) > FLAGS.max_qa_length:
-      tokens_qa = tokens_qa[- FLAGS.max_qa_length:]
+    tokens_context = tokenize_fn(example.context)
+    tokens_question = tokenize_fn(example.question)
 
-    if len(tokens_context) + len(tokens_qa) > FLAGS.max_seq_length - 3:
-      tokens = tokens_context[: FLAGS.max_seq_length - 3 - len(tokens_qa)]
+    if len(tokens_question) > FLAGS.max_qa_length:
+        tokens_question = tokens_question[- FLAGS.max_qa_length:]
+        question_mask = [0] * len(tokens_question)
     else:
-      tokens = tokens_context
+        question_mask = [0] * len(tokens_question)
+        pad_length = FLAGS.max_qa_length - len(tokens_question)
+        question_mask.extend([1] * pad_length)
+        tokens_question = tokens_question + ([0] * pad_length)
+
+    max_context_length = FLAGS.max_seq_length - 3 - len(tokens_question)
+    if len(tokens_context) + len(tokens_question) > FLAGS.max_seq_length - 3:
+        tokens = tokens_context[: max_context_length]
+        context_mask = [0] * len(tokens)
+    else:
+        context_mask = [0] * len(tokens_context)
+        tokens = tokens_context + ([0] * (max_context_length - len(tokens_context)))
+        context_mask = context_mask + ([1] * (max_context_length - len(tokens_context)))
 
     segment_ids = [SEG_ID_A] * len(tokens)
 
     tokens.append(SEP_ID)
     segment_ids.append(SEG_ID_A)
 
-    tokens.extend(tokens_qa)
-    segment_ids.extend([SEG_ID_B] * len(tokens_qa))
+    tokens = tokens + tokens_question
+    segment_ids = segment_ids + ([SEG_ID_B] * len(tokens_question))
 
     tokens.append(SEP_ID)
     segment_ids.append(SEG_ID_B)
@@ -202,37 +211,27 @@ def convert_single_example(example, tokenize_fn):
     tokens.append(CLS_ID)
     segment_ids.append(SEG_ID_CLS)
 
-    cur_input_ids = tokens
-    cur_input_mask = [0] * len(cur_input_ids)
+    input_ids = tokens
+    input_mask = context_mask + [0] + question_mask + [0, 0]
 
-    if len(cur_input_ids) < FLAGS.max_seq_length:
-      delta_len = FLAGS.max_seq_length - len(cur_input_ids)
-      cur_input_ids = [0] * delta_len + cur_input_ids
-      cur_input_mask = [1] * delta_len + cur_input_mask
-      segment_ids = [SEG_ID_PAD] * delta_len + segment_ids
-
-    assert len(cur_input_ids) == FLAGS.max_seq_length
-    assert len(cur_input_mask) == FLAGS.max_seq_length
+    assert len(input_ids) == FLAGS.max_seq_length
+    assert len(input_mask) == FLAGS.max_seq_length
     assert len(segment_ids) == FLAGS.max_seq_length
 
-    input_ids.extend(cur_input_ids)
-    input_mask.extend(cur_input_mask)
-    all_seg_ids.extend(segment_ids)
+    label_id = example.label
 
-  label_id = example.label
-
-  feature = InputFeatures(
-      input_ids=input_ids,
-      input_mask=input_mask,
-      segment_ids=all_seg_ids,
-      label_id=label_id)
-  return feature
+    feature = InputFeatures(
+        input_ids=input_ids,
+        input_mask=input_mask,
+        segment_ids=segment_ids,
+        label_id=label_id)
+    return feature
 
 
 class InputExample(object):
-  def __init__(self, context, qa_list, label, level):
+  def __init__(self, context, question, label, level):
     self.context = context
-    self.qa_list = qa_list
+    self.question = question
     self.label = label
     self.level = level
 
@@ -257,23 +256,10 @@ def get_examples(data_dir, set_type):
 
         for i in range(len(answers)):
           label = ord(answers[i]) - ord("A")
-          qa_list = []
-
           question = questions[i]
-          for j in range(4):
-            option = options[i][j]
-
-            if "_" in question:
-              qa_cat = question.replace("_", option)
-            else:
-              qa_cat = " ".join([question, option])
-
-            qa_list.append(qa_cat)
-
-          examples.append(InputExample(context, qa_list, label, level))
-          # Each InputExample is the question (context), list of strings (each string representing the form of the
-          # the question in its completed form), the label (an integer representing the choice number), and level of
-          # of difficulty.
+          current_options = options[i]
+          formatted_question = question + " Choices: " + '| '.join(map(str, current_options))
+          examples.append(InputExample(context, formatted_question, label, level))
 
   return examples
 
@@ -317,9 +303,9 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
   """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
   name_to_features = {
-      "input_ids": tf.FixedLenFeature([seq_length * 4], tf.int64),
-      "input_mask": tf.FixedLenFeature([seq_length * 4], tf.float32),
-      "segment_ids": tf.FixedLenFeature([seq_length * 4], tf.int64),
+      "input_ids": tf.FixedLenFeature([seq_length], tf.int64),
+      "input_mask": tf.FixedLenFeature([seq_length], tf.float32),
+      "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
       "label_ids": tf.FixedLenFeature([], tf.int64),
       "is_real_example": tf.FixedLenFeature([], tf.int64),
   }
@@ -357,11 +343,14 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
       d = d.repeat()
       # d = d.shuffle(buffer_size=100)
 
-    d = d.apply(
-        tf.contrib.data.map_and_batch(
-            lambda record: _decode_record(record, name_to_features),
-            batch_size=batch_size,
-            drop_remainder=drop_remainder))
+    # d = d.apply(
+    #     tf.contrib.data.map_and_batch(
+    #         lambda record: _decode_record(record, name_to_features),
+    #         batch_size=batch_size,
+    #         drop_remainder=drop_remainder))
+
+    d = d.map(lambda record: _decode_record(record, name_to_features)).batch(batch_size=batch_size,
+                                                                             drop_remainder=drop_remainder)
 
     return d
 
@@ -373,8 +362,7 @@ def get_model_fn():
     #### Training or Evaluation
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-    total_loss, per_example_loss, logits = function_builder.get_race_loss(
-        FLAGS, features, is_training)
+    total_loss, logits = function_builder.get_race_mac_loss(FLAGS, features, is_training)
 
     #### Check model parameters
     num_params = sum([np.prod(v.shape) for v in tf.trainable_variables()])
@@ -387,7 +375,7 @@ def get_model_fn():
     if mode == tf.estimator.ModeKeys.EVAL:
       assert FLAGS.num_hosts == 1
 
-      def metric_fn(per_example_loss, label_ids, logits, is_real_example):
+      def metric_fn(label_ids, logits, is_real_example):
         predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
         eval_input_dict = {
             'labels': label_ids,
@@ -396,7 +384,7 @@ def get_model_fn():
         }
         accuracy = tf.metrics.accuracy(**eval_input_dict)
 
-        loss = tf.metrics.mean(values=per_example_loss, weights=is_real_example)
+        loss = tf.metrics.mean(values=total_loss, weights=is_real_example)
         return {
             'eval_accuracy': accuracy,
             'eval_loss': loss}
@@ -405,7 +393,7 @@ def get_model_fn():
 
       #### Constucting evaluation TPUEstimatorSpec with new cache.
       label_ids = tf.reshape(features['label_ids'], [-1])
-      metric_args = [per_example_loss, label_ids, logits, is_real_example]
+      metric_args = [label_ids, logits, is_real_example]
 
       if FLAGS.use_tpu:
         eval_spec = tf.contrib.tpu.TPUEstimatorSpec(
@@ -466,7 +454,7 @@ def main(_):
     return encode_ids(sp, text)
 
   # TPU Configuration
-  run_config = model_utils.configure_tpu(FLAGS)
+  run_config = model_utils.configure(FLAGS)
 
   model_fn = get_model_fn()
 

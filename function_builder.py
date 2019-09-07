@@ -8,7 +8,12 @@ import os
 import tensorflow as tf
 import modeling
 import xlnet
+import MAC_network
 
+
+d_model = 512
+num_classes = 4
+max_steps = 10
 
 def construct_scalar_host_call(
     monitor_dict,
@@ -391,3 +396,56 @@ def get_race_loss(FLAGS, features, is_training):
     total_loss = tf.reduce_mean(per_example_loss)
 
   return total_loss, per_example_loss, logits
+
+def get_race_mac_loss(FLAGS, features, is_training):
+  """Loss for downstream multi-choice QA tasks such as RACE."""
+  # print("input shape before: " + str(features["input_ids"].shape))
+  bsz_per_core = tf.shape(features["input_ids"])[0]
+
+  def _transform_features(feature):
+    out = tf.reshape(feature, [bsz_per_core, 4, -1])
+    out = tf.transpose(out, [2, 0, 1])
+    out = tf.reshape(out, [-1, bsz_per_core * 4])
+    return out
+
+  # inp = _transform_features(features["input_ids"])
+  # seg_id = _transform_features(features["segment_ids"])
+  # inp_mask = _transform_features(features["input_mask"])
+  # label = tf.reshape(features["label_ids"], [bsz_per_core])
+
+  inp = features["input_ids"]
+  seg_id = features["segment_ids"]
+  inp_mask = features["input_mask"]
+  label = features["label_ids"]
+
+  # print("input shape after: " + str(inp.shape))
+
+  xlnet_config = xlnet.XLNetConfig(json_path=FLAGS.model_config_path)
+  run_config = xlnet.create_run_config(is_training, True, FLAGS)
+
+  xlnet_model = xlnet.XLNetModel(
+      xlnet_config=xlnet_config,
+      run_config=run_config,
+      input_ids=inp,
+      seg_ids=seg_id,
+      input_mask=inp_mask)
+  summary = xlnet_model.get_sequence_output()
+  # print("output shape: " + str(summary.shape))
+  # print("transposed shape: " + str(tf.transpose(summary, perm=[1, 0, 2])))
+
+  with tf.variable_scope("logits"):
+    article = tf.slice(summary, [0, 0, 0], [-1, FLAGS.max_seq_length - FLAGS.max_qa_length, -1])
+    question = tf.slice(summary, [0, FLAGS.max_seq_length - FLAGS.max_qa_length, 0], [-1, -1, -1])
+    network = MAC_network.MAC_network_generator(d_model, num_classes, max_steps)
+    logits = network(article, question, is_training)
+
+    # one_hot_target = tf.one_hot(label, 4)
+    # per_example_loss = -tf.reduce_sum(
+    #     tf.nn.log_softmax(logits) * one_hot_target, -1)
+    # total_loss = tf.reduce_mean(per_example_loss)
+
+    cross_entropy = tf.losses.softmax_cross_entropy(
+        logits=logits, onehot_labels=tf.one_hot(label, num_classes))
+
+
+  return cross_entropy, logits
