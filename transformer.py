@@ -126,9 +126,9 @@ class EncoderLayer(tf.keras.layers.Layer):
 
         self.ffn = point_wise_feed_forward_network(d_model, dff)
 
-        self.layernorm1 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
-        self.layernorm2 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
-        self.layernorm3 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
+        # self.layernorm1 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
+        # self.layernorm2 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
+        # self.layernorm3 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
 
         self.dropout1 = tf.keras.layers.Dropout(rate)
         self.dropout2 = tf.keras.layers.Dropout(rate)
@@ -138,16 +138,16 @@ class EncoderLayer(tf.keras.layers.Layer):
 
         attn1, attn_weights_block1 = self.mha1(knowledge, knowledge, knowledge, mask)  # (batch_size, target_seq_len, d_model)
         attn1 = self.dropout1(attn1, training=training)
-        out1 = self.layernorm1(attn1 + knowledge)
+        out1 = tf.contrib.layers.batch_norm(attn1 + knowledge, epsilon=1e-6, is_training=training) #self.layernorm1(attn1 + knowledge)
 
         attn2, attn_weights_block2 = self.mha2(
             question, question, out1, mask)  # (batch_size, target_seq_len, d_model)
         attn2 = self.dropout2(attn2, training=training)
-        out2 = self.layernorm2(attn2 + out1)  # (batch_size, target_seq_len, d_model)
+        out2 = tf.contrib.layers.batch_norm(attn2 + out1, epsilon=1e-6, is_training=training) #self.layernorm2(attn2 + out1)  # (batch_size, target_seq_len, d_model)
 
         ffn_output = self.ffn(out2)  # (batch_size, target_seq_len, d_model)
         ffn_output = self.dropout3(ffn_output, training=training)
-        out3 = self.layernorm3(ffn_output + out2)  # (batch_size, target_seq_len, d_model)
+        out3 = tf.contrib.layers.batch_norm(ffn_output + out2, epsilon=1e-6, is_training=training) #self.layernorm3(ffn_output + out2)  # (batch_size, target_seq_len, d_model)
 
         return out3, attn_weights_block1, attn_weights_block2
 
