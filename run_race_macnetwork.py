@@ -393,8 +393,8 @@ def get_model_fn():
             accuracy = tf.metrics.accuracy(**eval_input_dict)
             loss = tf.metrics.mean(values=per_example_loss, weights=is_real_example)
             return {
-                'eval_accuracy': accuracy[1],
-                'eval_loss': loss[1]}
+                'eval_accuracy': accuracy,
+                'eval_loss': loss}
 
     #### Evaluation mode
     if mode == tf.estimator.ModeKeys.EVAL:
@@ -431,7 +431,9 @@ def get_model_fn():
           scaffold_fn=scaffold_fn)
     else:
       train_hook_list = []
-      train_tensors_log = metric_fn(*metric_args)
+      metric_dict = metric_fn(*metric_args)
+
+      train_tensors_log = {'accuracy': metric_dict['eval_accuracy'][0]}
       train_hook_list.append(tf.train.LoggingTensorHook(tensors=train_tensors_log, every_n_iter=100))
       train_spec = tf.estimator.EstimatorSpec(
           mode=mode, loss=total_loss, train_op=train_op, training_hooks=train_hook_list)
