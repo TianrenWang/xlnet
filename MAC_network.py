@@ -81,6 +81,7 @@ def MAC_network_generator(d_model, num_classes, max_steps):
         """Constructs the MAC Network model given the inputs."""
 
         step_encoder = positional_encoding(max_steps, d_model)
+        step_encoder = tf.tile(step_encoder, [knowledge.shape[0], 1, 1])
 
         decoder1 = tf.keras.layers.Dense(768)
         decoder2 = tf.keras.layers.Dense(512)

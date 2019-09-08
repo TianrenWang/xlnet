@@ -28,7 +28,7 @@ class Controller(tf.keras.layers.Layer):
         # context (BERT-encoded question): [batch, seq_len, d]
 
         cq = self.cq(tf.concat([quest_state, control], axis=-1)) #[batch, d]
-        focus = self.focus(cq * context) # [batch, seq_len, d]
+        focus = self.focus(tf.expand_dims(cq, 1) * context) # [batch, seq_len, d]
         focus = tf.keras.backend.squeeze(focus, 2)
 
         #attention, attention_weights = self.transformer(context, focus, training) #attention: [batch, seq_len, d]
@@ -53,15 +53,15 @@ class Reader(tf.keras.layers.Layer):
         # control (the operation to be done this step): [d]
         # context (BERT-encoded question): [seq_len, d]
 
-        reflection = self.memory(memory) * self.knowledge(knowledge)
+        reflection = tf.expand_dims(self.memory(memory), 1) * self.knowledge(knowledge)
         disjoint = self.disjoint(tf.concat([knowledge, reflection], 2))
-        retrieve = self.retrieve(disjoint * control)
+        retrieve = self.retrieve(disjoint * tf.expand_dims(control, 1))
         retrieve = tf.keras.backend.squeeze(retrieve, 2)
 
         attention = tf.nn.softmax(retrieve) #[batch, seq_len]
 
         #attention, attention_weights = self.transformer(knowledge, retrieve, training)
-        return tf.reduce_mean(attention * knowledge, 1), attention # [batch, d]
+        return tf.reduce_mean(tf.expand_dims(attention, -1) * knowledge, 1), attention # [batch, d]
 
 
 class Writer(tf.keras.layers.Layer):
@@ -84,7 +84,7 @@ class Writer(tf.keras.layers.Layer):
 
         m1 = self.m1(tf.concat([memory, read], 1))
 
-        control_attention = self.control_attention(past_controls * control)
+        control_attention = self.control_attention(past_controls * tf.expand_dims(control, 1))
         control_attention = tf.squeeze(control_attention, 2) # [batch, iterations]
         iteration_mask = create_padding_mask(control_attention)
         control_attention += iteration_mask * -1e9
