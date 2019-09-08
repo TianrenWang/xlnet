@@ -161,7 +161,6 @@ class MAC_Cell(tf.keras.layers.Layer):
         new_control, control_attention = self.controller(quest_state, prev_control, question, training)
         read, read_attention = self.reader(prev_memory, knowledge, new_control, training)
         new_memory = self.writer(prev_memory, read, new_control, h, training)
-        print(h[0])
         all_controls = tf.slice(h[0], [0, 0, 0], [-1, self.steps - 1, -1])
         all_memories = tf.slice(h[1], [0, 0, 0], [-1, self.steps - 1, -1])
         all_controls = tf.concat([tf.expand_dims(new_control, 1), all_controls], 1)

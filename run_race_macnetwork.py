@@ -362,7 +362,7 @@ def get_model_fn():
     #### Training or Evaluation
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-    total_loss, logits = function_builder.get_race_mac_loss(FLAGS, features, is_training)
+    total_loss, per_example_loss, logits = function_builder.get_race_mac_loss(FLAGS, features, is_training)
 
     #### Check model parameters
     num_params = sum([np.prod(v.shape) for v in tf.trainable_variables()])
@@ -371,29 +371,34 @@ def get_model_fn():
     #### load pretrained models
     scaffold_fn = model_utils.init_from_checkpoint(FLAGS)
 
+    is_real_example = tf.cast(features["is_real_example"], dtype=tf.float32)
+
+    #### Constucting evaluation TPUEstimatorSpec with new cache.
+    label_ids = tf.reshape(features['label_ids'], [-1])
+    metric_args = [label_ids, per_example_loss, logits, is_real_example]
+    # with tf.variable_scope("metrics"):
+    #     accuracy = tf.math.equal(label_ids, tf.argmax(logits, axis=-1, output_type=tf.int32))
+    #     accuracy = tf.reduce_mean(tf.cast(accuracy, tf.float32))
+    #
+    # print("accuracy: " + str(accuracy))
+
+    def metric_fn(label_ids, per_example_loss, logits, is_real_example):
+        with tf.variable_scope("metrics", reuse=True):
+            predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
+            eval_input_dict = {
+                'labels': label_ids,
+                'predictions': predictions,
+                'weights': is_real_example
+            }
+            accuracy = tf.metrics.accuracy(**eval_input_dict)
+            loss = tf.metrics.mean(values=per_example_loss, weights=is_real_example)
+            return {
+                'eval_accuracy': accuracy[1],
+                'eval_loss': loss[1]}
+
     #### Evaluation mode
     if mode == tf.estimator.ModeKeys.EVAL:
       assert FLAGS.num_hosts == 1
-
-      def metric_fn(label_ids, logits, is_real_example):
-        predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
-        eval_input_dict = {
-            'labels': label_ids,
-            'predictions': predictions,
-            'weights': is_real_example
-        }
-        accuracy = tf.metrics.accuracy(**eval_input_dict)
-
-        loss = tf.metrics.mean(values=total_loss, weights=is_real_example)
-        return {
-            'eval_accuracy': accuracy,
-            'eval_loss': loss}
-
-      is_real_example = tf.cast(features["is_real_example"], dtype=tf.float32)
-
-      #### Constucting evaluation TPUEstimatorSpec with new cache.
-      label_ids = tf.reshape(features['label_ids'], [-1])
-      metric_args = [label_ids, logits, is_real_example]
 
       if FLAGS.use_tpu:
         eval_spec = tf.contrib.tpu.TPUEstimatorSpec(
@@ -425,8 +430,11 @@ def get_model_fn():
           mode=mode, loss=total_loss, train_op=train_op, host_call=host_call,
           scaffold_fn=scaffold_fn)
     else:
+      train_hook_list = []
+      train_tensors_log = metric_fn(*metric_args)
+      train_hook_list.append(tf.train.LoggingTensorHook(tensors=train_tensors_log, every_n_iter=100))
       train_spec = tf.estimator.EstimatorSpec(
-          mode=mode, loss=total_loss, train_op=train_op)
+          mode=mode, loss=total_loss, train_op=train_op, training_hooks=train_hook_list)
 
     return train_spec
 

@@ -444,8 +444,9 @@ def get_race_mac_loss(FLAGS, features, is_training):
     #     tf.nn.log_softmax(logits) * one_hot_target, -1)
     # total_loss = tf.reduce_mean(per_example_loss)
 
-    cross_entropy = tf.losses.softmax_cross_entropy(
-        logits=logits, onehot_labels=tf.one_hot(label, num_classes))
+    per_example_loss = tf.losses.sparse_softmax_cross_entropy(
+        logits=logits, labels=label, reduction=tf.losses.Reduction.NONE)
+    total_loss = tf.reduce_mean(per_example_loss)
 
 
-  return cross_entropy, logits
+  return total_loss, per_example_loss, logits
