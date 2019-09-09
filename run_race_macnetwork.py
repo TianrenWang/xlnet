@@ -72,6 +72,7 @@ flags.DEFINE_string("data_dir", default="",
 
 # TPUs and machines
 flags.DEFINE_bool("use_tpu", default=False, help="whether to use TPU.")
+flags.DEFINE_bool("use_mac", default=True, help="whether to use mac network.")
 flags.DEFINE_integer("num_hosts", default=1, help="How many TPU hosts.")
 flags.DEFINE_integer("num_core_per_host", default=8,
       help="8 for TPU v2 and v3-8, 16 for larger TPU v3 pod. In the context "
@@ -357,6 +358,90 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
   return input_fn
 
 
+def get_old_model_fn():
+  def model_fn(features, labels, mode, params):
+    #### Training or Evaluation
+    is_training = (mode == tf.estimator.ModeKeys.TRAIN)
+    label_ids = tf.reshape(features['label_ids'], [-1])
+    is_real_example = tf.cast(features["is_real_example"], dtype=tf.float32)
+
+    total_loss, per_example_loss, logits = function_builder.get_race_loss(
+        FLAGS, features, is_training)
+
+    with tf.variable_scope("train_metrics"):
+        accuracy = tf.metrics.accuracy(label_ids, tf.argmax(logits, axis=-1, output_type=tf.int32), is_real_example)
+
+    #### Check model parameters
+    num_params = sum([np.prod(v.shape) for v in tf.trainable_variables()])
+    tf.logging.info('#params: {}'.format(num_params))
+
+    #### load pretrained models
+    scaffold_fn = model_utils.init_from_checkpoint(FLAGS)
+
+    #### Evaluation mode
+    if mode == tf.estimator.ModeKeys.EVAL:
+      assert FLAGS.num_hosts == 1
+
+      def metric_fn(per_example_loss, label_ids, logits, is_real_example):
+        with tf.variable_scope("eval_metrics", reuse=True):
+            predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
+            eval_input_dict = {
+                'labels': label_ids,
+                'predictions': predictions,
+                'weights': is_real_example
+            }
+            accuracy = tf.metrics.accuracy(**eval_input_dict)
+
+            loss = tf.metrics.mean(values=per_example_loss, weights=is_real_example)
+            return {
+                'eval_accuracy': accuracy,
+                'eval_loss': loss}
+
+      #### Constucting evaluation TPUEstimatorSpec with new cache.
+      metric_args = [per_example_loss, label_ids, logits, is_real_example]
+
+      if FLAGS.use_tpu:
+        eval_spec = tf.contrib.tpu.TPUEstimatorSpec(
+            mode=mode,
+            loss=total_loss,
+            eval_metrics=(metric_fn, metric_args),
+            scaffold_fn=scaffold_fn)
+      else:
+        eval_spec = tf.estimator.EstimatorSpec(
+            mode=mode,
+            loss=total_loss,
+            eval_metric_ops=metric_fn(*metric_args))
+
+      return eval_spec
+
+
+    #### Configuring the optimizer
+    train_op, learning_rate, _ = model_utils.get_train_op(FLAGS, total_loss)
+
+    monitor_dict = {}
+    monitor_dict["lr"] = learning_rate
+
+    #### Constucting training TPUEstimatorSpec with new cache.
+    if FLAGS.use_tpu:
+      #### Creating host calls
+      host_call = None
+
+      train_spec = tf.contrib.tpu.TPUEstimatorSpec(
+          mode=mode, loss=total_loss, train_op=train_op, host_call=host_call,
+          scaffold_fn=scaffold_fn)
+    else:
+      train_hook_list = []
+
+      train_tensors_log = {'accuracy': accuracy[1]}
+      train_hook_list.append(tf.train.LoggingTensorHook(tensors=train_tensors_log, every_n_iter=100))
+      train_spec = tf.estimator.EstimatorSpec(
+          mode=mode, loss=total_loss, train_op=train_op)
+
+    return train_spec
+
+  return model_fn
+
+
 def get_model_fn():
   def model_fn(features, labels, mode, params):
     #### Training or Evaluation
@@ -466,7 +551,9 @@ def main(_):
   # TPU Configuration
   run_config = model_utils.configure(FLAGS)
 
-  model_fn = get_model_fn()
+  model_fn = get_old_model_fn()
+  if (FLAGS.use_mac):
+    model_fn = get_model_fn()
 
   spm_basename = os.path.basename(FLAGS.spiece_model_file)
 

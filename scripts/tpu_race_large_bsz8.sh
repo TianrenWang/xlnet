@@ -27,6 +27,7 @@ TPU_NAME=
 
 python3 ../run_race.py \
   --use_tpu=False \
+  --use_mac=False \
   --tpu=${TPU_NAME} \
   --num_hosts=1 \
   --num_core_per_host=1 \
