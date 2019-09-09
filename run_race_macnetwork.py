@@ -376,14 +376,15 @@ def get_model_fn():
     #### Constucting evaluation TPUEstimatorSpec with new cache.
     label_ids = tf.reshape(features['label_ids'], [-1])
     metric_args = [label_ids, per_example_loss, logits, is_real_example]
-    # with tf.variable_scope("metrics"):
+    with tf.variable_scope("train_metrics"):
+        accuracy = tf.metrics.accuracy(label_ids, tf.argmax(logits, axis=-1, output_type=tf.int32), is_real_example)
     #     accuracy = tf.math.equal(label_ids, tf.argmax(logits, axis=-1, output_type=tf.int32))
     #     accuracy = tf.reduce_mean(tf.cast(accuracy, tf.float32))
     #
     # print("accuracy: " + str(accuracy))
 
     def metric_fn(label_ids, per_example_loss, logits, is_real_example):
-        with tf.variable_scope("metrics", reuse=True):
+        with tf.variable_scope("eval_metrics", reuse=True):
             predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
             eval_input_dict = {
                 'labels': label_ids,
@@ -431,9 +432,8 @@ def get_model_fn():
           scaffold_fn=scaffold_fn)
     else:
       train_hook_list = []
-      metric_dict = metric_fn(*metric_args)
 
-      train_tensors_log = {'accuracy': metric_dict['eval_accuracy'][0]}
+      train_tensors_log = {'accuracy': accuracy[1]}
       train_hook_list.append(tf.train.LoggingTensorHook(tensors=train_tensors_log, every_n_iter=100))
       train_spec = tf.estimator.EstimatorSpec(
           mode=mode, loss=total_loss, train_op=train_op, training_hooks=train_hook_list)
