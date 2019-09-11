@@ -435,17 +435,15 @@ def get_race_loss_without_mem(FLAGS, features, is_training):
 def get_race_mac_loss(FLAGS, features, is_training):
   """Loss for downstream multi-choice QA tasks such as RACE."""
 
-  # inp = _transform_features(features["input_ids"])
-  # seg_id = _transform_features(features["segment_ids"])
-  # inp_mask = _transform_features(features["input_mask"])
-  # label = tf.reshape(features["label_ids"], [bsz_per_core])
+  def _transform_features(feature):
+      return tf.transpose(feature, [1, 0])
 
-  inp = features["input_ids"]
-  seg_id = features["segment_ids"]
-  inp_mask = features["input_mask"]
+  inp = _transform_features(features["input_ids"])
+  seg_id = _transform_features(features["segment_ids"])
+  inp_mask = _transform_features(features["input_mask"])
   label = features["label_ids"]
 
-  # print("input shape after: " + str(inp.shape))
+  print("input shape after: " + str(inp.shape))
 
   xlnet_config = xlnet.XLNetConfig(json_path=FLAGS.model_config_path)
   run_config = xlnet.create_run_config(is_training, True, FLAGS)
@@ -457,8 +455,9 @@ def get_race_mac_loss(FLAGS, features, is_training):
       seg_ids=seg_id,
       input_mask=inp_mask)
   summary = xlnet_model.get_sequence_output()
-  # print("output shape: " + str(summary.shape))
-  # print("transposed shape: " + str(tf.transpose(summary, perm=[1, 0, 2])))
+  print("output shape: " + str(summary.shape))
+  print("transposed shape: " + str(tf.transpose(summary, perm=[1, 0, 2])))
+  summary = tf.transpose(summary, perm=[1, 0, 2])
 
   with tf.variable_scope("logits"):
     article = tf.slice(summary, [0, 0, 0], [-1, FLAGS.max_seq_length - FLAGS.max_qa_length, -1])
