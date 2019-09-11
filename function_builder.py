@@ -360,7 +360,7 @@ def get_qa_outputs(FLAGS, features, is_training):
 
 def get_race_loss(FLAGS, features, is_training):
   """Loss for downstream multi-choice QA tasks such as RACE."""
-
+  print("original input: " + str(features["input_ids"].shape))
   bsz_per_core = tf.shape(features["input_ids"])[0]
 
   def _transform_features(feature):
@@ -373,6 +373,7 @@ def get_race_loss(FLAGS, features, is_training):
   seg_id = _transform_features(features["segment_ids"])
   inp_mask = _transform_features(features["input_mask"])
   label = tf.reshape(features["label_ids"], [bsz_per_core])
+  print("transformed input: " + str(inp.shape))
 
   xlnet_config = xlnet.XLNetConfig(json_path=FLAGS.model_config_path)
   run_config = xlnet.create_run_config(is_training, True, FLAGS)
@@ -384,6 +385,8 @@ def get_race_loss(FLAGS, features, is_training):
       seg_ids=seg_id,
       input_mask=inp_mask)
   summary = xlnet_model.get_pooled_out(FLAGS.summary_type, FLAGS.use_summ_proj)
+
+  print("summary: " + str(summary.shape))
 
   with tf.variable_scope("logits"):
     logits = tf.layers.dense(summary, 1,
@@ -397,12 +400,15 @@ def get_race_loss(FLAGS, features, is_training):
 
   return total_loss, per_example_loss, logits
 
-def get_race_loss_without_transform(FLAGS, features, is_training):
+def get_race_loss_without_mem(FLAGS, features, is_training):
   """Loss for downstream multi-choice QA tasks such as RACE."""
 
-  inp = features["input_ids"]
-  seg_id = features["segment_ids"]
-  inp_mask = features["input_mask"]
+  def _transform_features(feature):
+    return tf.transpose(feature, [1, 0])
+
+  inp = _transform_features(features["input_ids"])
+  seg_id = _transform_features(features["segment_ids"])
+  inp_mask = _transform_features(features["input_mask"])
   label = features["label_ids"]
 
   xlnet_config = xlnet.XLNetConfig(json_path=FLAGS.model_config_path)
