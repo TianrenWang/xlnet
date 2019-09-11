@@ -365,7 +365,7 @@ def get_old_model_fn():
     label_ids = tf.reshape(features['label_ids'], [-1])
     is_real_example = tf.cast(features["is_real_example"], dtype=tf.float32)
 
-    total_loss, per_example_loss, logits = function_builder.get_race_loss(
+    total_loss, per_example_loss, logits = function_builder.get_race_loss_without_transform(
         FLAGS, features, is_training)
 
     with tf.variable_scope("train_metrics"):

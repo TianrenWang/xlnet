@@ -224,6 +224,9 @@ def convert_single_example(example, tokenize_fn):
 
   label_id = example.label
 
+  # Basically, each sample contains four segments, each segment representing one choice
+  # but each segment also contains a copy of the original article, so the article is
+  # duplicated three times for each sample.
   feature = InputFeatures(
       input_ids=input_ids,
       input_mask=input_mask,
@@ -284,6 +287,14 @@ def file_based_convert_examples_to_features(examples, tokenize_fn, output_file):
 
   tf.logging.info("Start writing tfrecord %s.", output_file)
   writer = tf.python_io.TFRecordWriter(output_file)
+
+  # So each example has a context and one question
+  # print("1: " + str(examples[0].context))
+  # print("1: " + str(examples[0].qa_list))
+  # print("2: " + str(examples[1].context))
+  # print("2: " + str(examples[1].qa_list))
+  # print("3: " + str(examples[2].context))
+  # print("3: " + str(examples[2].qa_list))
 
   for ex_index, example in enumerate(examples):
     if ex_index % 10000 == 0:
