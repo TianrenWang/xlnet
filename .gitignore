@@ -102,3 +102,12 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+.idea/
+data
+xlnet_cased_L-24_H-1024_A-16
+xlnet_cased_L-12_H-768_A-12
+result
+experiment
+proc_data
+RACE/
