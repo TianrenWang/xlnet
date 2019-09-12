@@ -105,12 +105,14 @@ def init_from_checkpoint(FLAGS, global_vars=False):
 
     # Log customized initialization
     tf.logging.info("**** Global Variables ****")
+    count = 1
     for var in tvars:
       init_string = ""
       if var.name in initialized_variable_names:
         init_string = ", *INIT_FROM_CKPT*"
-      tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
+      tf.logging.info("var#%s  name = %s, shape = %s%s", count, var.name, var.shape,
                       init_string)
+      count += 1
   return scaffold_fn
 
 
@@ -163,8 +165,10 @@ def get_train_op(FLAGS, total_loss, grads_and_vars=None):
   if FLAGS.use_tpu:
     optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
 
+  variables = tf.trainable_variables()[122:]
+
   if grads_and_vars is None:
-    grads_and_vars = optimizer.compute_gradients(total_loss)
+    grads_and_vars = optimizer.compute_gradients(total_loss, variables)
   gradients, variables = zip(*grads_and_vars)
   clipped, gnorm = tf.clip_by_global_norm(gradients, FLAGS.clip)
 

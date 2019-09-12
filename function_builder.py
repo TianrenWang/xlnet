@@ -446,8 +446,7 @@ def get_race_mac_loss(FLAGS, features, is_training):
   print("input shape after: " + str(inp.shape))
 
   xlnet_config = xlnet.XLNetConfig(json_path=FLAGS.model_config_path)
-  # run_config = xlnet.create_run_config(is_training, True, FLAGS)
-  run_config = xlnet.create_run_config(False, False, FLAGS)
+  run_config = xlnet.create_run_config(is_training, True, FLAGS)
 
   xlnet_model = xlnet.XLNetModel(
       xlnet_config=xlnet_config,
