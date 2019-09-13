@@ -587,7 +587,11 @@ def main(_):
         seq_length=FLAGS.max_seq_length,
         is_training=True,
         drop_remainder=True)
-    estimator.train(input_fn=train_input_fn, max_steps=FLAGS.train_steps)
+    train_spec = tf.estimator.TrainSpec(
+        input_fn=train_input_fn,
+        max_steps=100000
+    )
+    #estimator.train(input_fn=train_input_fn, max_steps=FLAGS.train_steps)
 
   if FLAGS.do_eval:
     eval_examples = get_examples(FLAGS.data_dir, FLAGS.eval_split)
@@ -625,17 +629,22 @@ def main(_):
         is_training=False,
         drop_remainder=True)
 
-    ret = estimator.evaluate(
-        input_fn=eval_input_fn,
-        steps=eval_steps)
+    eval_spec = tf.estimator.EvalSpec(
+        input_fn=eval_input_fn
+    )
+
+    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+    # ret = estimator.evaluate(
+    #     input_fn=eval_input_fn,
+    #     steps=eval_steps)
 
     # Log current result
-    tf.logging.info("=" * 80)
-    log_str = "Eval | "
-    for key, val in ret.items():
-      log_str += "{} {} | ".format(key, val)
-    tf.logging.info(log_str)
-    tf.logging.info("=" * 80)
+    # tf.logging.info("=" * 80)
+    # log_str = "Eval | "
+    # for key, val in ret.items():
+    #   log_str += "{} {} | ".format(key, val)
+    # tf.logging.info(log_str)
+    # tf.logging.info("=" * 80)
 
 
 if __name__ == "__main__":
