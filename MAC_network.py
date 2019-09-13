@@ -101,7 +101,7 @@ def MAC_network_generator(d_model, num_classes, max_steps):
         question_repre = tf.keras.Input((512), tensor=question_repre)
 
         mac_rnn = tf.keras.layers.RNN(mac_cell)
-        with tf.variable_scope('mac_rnn', reuse=True):
+        with tf.variable_scope('mac_rnn', reuse=tf.AUTO_REUSE):
             final_output = mac_rnn(step_encoder, constants=[decoded_knowledge, context_words, question_repre], training=is_training)
 
         memory = tf.slice(final_output[1], [0, 0, 0], [-1, 1, -1])
