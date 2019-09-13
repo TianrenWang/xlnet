@@ -443,8 +443,6 @@ def get_race_mac_loss(FLAGS, features, is_training):
   inp_mask = _transform_features(features["input_mask"])
   label = features["label_ids"]
 
-  print("input shape after: " + str(inp.shape))
-
   xlnet_config = xlnet.XLNetConfig(json_path=FLAGS.model_config_path)
   run_config = xlnet.create_run_config(is_training, True, FLAGS)
 
@@ -455,8 +453,6 @@ def get_race_mac_loss(FLAGS, features, is_training):
       seg_ids=seg_id,
       input_mask=inp_mask)
   summary = xlnet_model.get_sequence_output()
-  print("output shape: " + str(summary.shape))
-  print("transposed shape: " + str(tf.transpose(summary, perm=[1, 0, 2])))
   summary = tf.transpose(summary, perm=[1, 0, 2])
 
   with tf.variable_scope("logits"):

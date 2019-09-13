@@ -462,9 +462,9 @@ def get_model_fn():
     label_ids = tf.reshape(features['label_ids'], [-1])
     metric_args = [label_ids, per_example_loss, logits, is_real_example]
     with tf.variable_scope("train_metrics"):
-        accuracy = tf.metrics.accuracy(label_ids, tf.argmax(logits, axis=-1, output_type=tf.int32), is_real_example)
-    #     accuracy = tf.math.equal(label_ids, tf.argmax(logits, axis=-1, output_type=tf.int32))
-    #     accuracy = tf.reduce_mean(tf.cast(accuracy, tf.float32))
+        # accuracy = tf.metrics.accuracy(label_ids, tf.argmax(logits, axis=-1, output_type=tf.int32), is_real_example)
+        accuracy = tf.math.equal(label_ids, tf.argmax(logits, axis=-1, output_type=tf.int32))
+        accuracy = tf.reduce_mean(tf.cast(accuracy, tf.float32))
     #
     # print("accuracy: " + str(accuracy))
 
@@ -518,7 +518,7 @@ def get_model_fn():
     else:
       train_hook_list = []
 
-      train_tensors_log = {'accuracy': accuracy[1]}
+      train_tensors_log = {'accuracy': accuracy}
       train_hook_list.append(tf.train.LoggingTensorHook(tensors=train_tensors_log, every_n_iter=100))
       train_spec = tf.estimator.EstimatorSpec(
           mode=mode, loss=total_loss, train_op=train_op, training_hooks=train_hook_list)
