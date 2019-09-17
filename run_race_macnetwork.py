@@ -572,79 +572,70 @@ def main(_):
         config=run_config)
 
   if FLAGS.do_train:
-    train_file_base = "{}.len-{}.train.tf_record".format(
-        spm_basename, FLAGS.max_seq_length)
-    train_file = os.path.join(FLAGS.output_dir, train_file_base)
+      train_file_base = "{}.len-{}.train.tf_record".format(
+          spm_basename, FLAGS.max_seq_length)
+      train_file = os.path.join(FLAGS.output_dir, train_file_base)
 
-    if not tf.gfile.Exists(train_file) or FLAGS.overwrite_data:
-      train_examples = get_examples(FLAGS.data_dir, "train")
-      random.shuffle(train_examples)
-      file_based_convert_examples_to_features(
-          train_examples, tokenize_fn, train_file)
+      if not tf.gfile.Exists(train_file) or FLAGS.overwrite_data:
+          train_examples = get_examples(FLAGS.data_dir, "train")
+          random.shuffle(train_examples)
+          file_based_convert_examples_to_features(
+              train_examples, tokenize_fn, train_file)
 
-    train_input_fn = file_based_input_fn_builder(
-        input_file=train_file,
-        seq_length=FLAGS.max_seq_length,
-        is_training=True,
-        drop_remainder=True)
-    train_spec = tf.estimator.TrainSpec(
-        input_fn=train_input_fn,
-        max_steps=100000
-    )
-    #estimator.train(input_fn=train_input_fn, max_steps=FLAGS.train_steps)
+      train_input_fn = file_based_input_fn_builder(
+          input_file=train_file,
+          seq_length=FLAGS.max_seq_length,
+          is_training=True,
+          drop_remainder=True)
+      estimator.train(input_fn=train_input_fn, max_steps=FLAGS.train_steps)
 
   if FLAGS.do_eval:
-    eval_examples = get_examples(FLAGS.data_dir, FLAGS.eval_split)
-    tf.logging.info("Num of eval samples: {}".format(len(eval_examples)))
+      eval_examples = get_examples(FLAGS.data_dir, FLAGS.eval_split)
+      tf.logging.info("Num of eval samples: {}".format(len(eval_examples)))
 
-    # TPU requires a fixed batch size for all batches, therefore the number
-    # of examples must be a multiple of the batch size, or else examples
-    # will get dropped. So we pad with fake examples which are ignored
-    # later on. These do NOT count towards the metric (all tf.metrics
-    # support a per-instance weight, and these get a weight of 0.0).
-    #
-    # Modified in XL: We also adopt the same mechanism for GPUs.
+      # TPU requires a fixed batch size for all batches, therefore the number
+      # of examples must be a multiple of the batch size, or else examples
+      # will get dropped. So we pad with fake examples which are ignored
+      # later on. These do NOT count towards the metric (all tf.metrics
+      # support a per-instance weight, and these get a weight of 0.0).
+      #
+      # Modified in XL: We also adopt the same mechanism for GPUs.
 
-    while len(eval_examples) % FLAGS.eval_batch_size != 0:
-      eval_examples.append(PaddingInputExample())
+      while len(eval_examples) % FLAGS.eval_batch_size != 0:
+          eval_examples.append(PaddingInputExample())
 
-    eval_file_base = "{}.len-{}.{}.tf_record".format(
-        spm_basename, FLAGS.max_seq_length, FLAGS.eval_split)
+      eval_file_base = "{}.len-{}.{}.tf_record".format(
+          spm_basename, FLAGS.max_seq_length, FLAGS.eval_split)
 
-    if FLAGS.high_only:
-      eval_file_base = "high." + eval_file_base
-    elif FLAGS.middle_only:
-      eval_file_base = "middle." + eval_file_base
+      if FLAGS.high_only:
+          eval_file_base = "high." + eval_file_base
+      elif FLAGS.middle_only:
+          eval_file_base = "middle." + eval_file_base
 
-    eval_file = os.path.join(FLAGS.output_dir, eval_file_base)
-    file_based_convert_examples_to_features(
-        eval_examples, tokenize_fn, eval_file)
+      eval_file = os.path.join(FLAGS.output_dir, eval_file_base)
+      file_based_convert_examples_to_features(
+          eval_examples, tokenize_fn, eval_file)
 
-    assert len(eval_examples) % FLAGS.eval_batch_size == 0
-    eval_steps = int(len(eval_examples) // FLAGS.eval_batch_size)
+      assert len(eval_examples) % FLAGS.eval_batch_size == 0
+      eval_steps = int(len(eval_examples) // FLAGS.eval_batch_size)
 
-    eval_input_fn = file_based_input_fn_builder(
-        input_file=eval_file,
-        seq_length=FLAGS.max_seq_length,
-        is_training=False,
-        drop_remainder=True)
+      eval_input_fn = file_based_input_fn_builder(
+          input_file=eval_file,
+          seq_length=FLAGS.max_seq_length,
+          is_training=False,
+          drop_remainder=True)
 
-    eval_spec = tf.estimator.EvalSpec(
-        input_fn=eval_input_fn
-    )
+      ret = estimator.evaluate(
+          input_fn=eval_input_fn,
+          steps=eval_steps)
 
-    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
-    # ret = estimator.evaluate(
-    #     input_fn=eval_input_fn,
-    #     steps=eval_steps)
-
-    # Log current result
-    # tf.logging.info("=" * 80)
-    # log_str = "Eval | "
-    # for key, val in ret.items():
-    #   log_str += "{} {} | ".format(key, val)
-    # tf.logging.info(log_str)
-    # tf.logging.info("=" * 80)
+      # Log current result
+      tf.logging.info("=" * 80)
+      log_str = "Eval | "
+      for key, val in ret.items():
+          log_str += "{} {} | ".format(key, val)
+      tf.logging.info(log_str)
+      tf.logging.info("=" * 80)
 
 
 if __name__ == "__main__":

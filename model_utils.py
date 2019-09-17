@@ -165,7 +165,7 @@ def get_train_op(FLAGS, total_loss, grads_and_vars=None):
   if FLAGS.use_tpu:
     optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
 
-  variables = tf.trainable_variables()[122:]
+  variables = tf.trainable_variables()[5:44] + tf.trainable_variables()[123:]
 
   if grads_and_vars is None:
     grads_and_vars = optimizer.compute_gradients(total_loss, variables)

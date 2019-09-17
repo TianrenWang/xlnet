@@ -25,7 +25,7 @@ TPU_NAME=
 
 python3 run_race_macnetwork.py \
   --use_tpu=False \
-  --use_mac=False \
+  --use_mac=True \
   --tpu=${TPU_NAME} \
   --num_hosts=1 \
   --num_core_per_host=8 \
@@ -46,7 +46,7 @@ python3 run_race_macnetwork.py \
   --save_steps=1000 \
   --iterations=1000 \
   --warmup_steps=1000 \
-  --learning_rate=2e-5 \
+  --learning_rate=1e-6 \
   --weight_decay=0 \
   --adam_epsilon=1e-6 \
   $@
