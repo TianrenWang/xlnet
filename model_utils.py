@@ -141,10 +141,8 @@ def get_train_op(FLAGS, total_loss, grads_and_vars=None):
   if FLAGS.use_tpu:
     optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
 
-  variables = tf.trainable_variables()[-260:]
-
   if grads_and_vars is None:
-    grads_and_vars = optimizer.compute_gradients(total_loss, variables)
+    grads_and_vars = optimizer.compute_gradients(total_loss)
   gradients, variables = zip(*grads_and_vars)
   clipped, gnorm = tf.clip_by_global_norm(gradients, FLAGS.clip)
 
